@@ -2,13 +2,10 @@ package gwp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
-
-	merr "github.tools.sap/IO-CLOUD/multi-error"
 )
 
 const (
@@ -16,7 +13,7 @@ const (
 )
 
 var (
-	PoolClosedErr = errors.New("pool is closed. No further job requests can be entertained")
+	PoolClosedErr = Wrapf(nil, PoolClosed, "pool is closed. No further job requests can be entertained")
 )
 
 type Pool struct {
@@ -34,7 +31,7 @@ type Pool struct {
 
 func NewPool(id string, maxWorkers int, options ...PoolOption) (*Pool, error) {
 	if maxWorkers <= 0 {
-		return nil, fmt.Errorf("maxWorkers should be greater than 0. Value passed: %d\n", maxWorkers)
+		return nil, Wrapf(nil, InvalidMaxWorker, "maxWorkers should be greater than 0. Value passed: %d\n", maxWorkers)
 	}
 	opts := buildPoolOptions(options...)
 	maxJobs := opts.MaxJobs
@@ -42,7 +39,7 @@ func NewPool(id string, maxWorkers int, options ...PoolOption) (*Pool, error) {
 		maxJobs = defaultMaxJobs
 	}
 	if opts.WarmWorkers > maxWorkers {
-		return nil, fmt.Errorf("warm workers: %d cannot be more than max workers: %d", opts.WarmWorkers, maxWorkers)
+		return nil, Wrapf(nil, InvalidWarmWorkers, "warm workers: %d cannot be more than max workers: %d", opts.WarmWorkers, maxWorkers)
 	}
 
 	quitC := make(chan struct{})
@@ -219,7 +216,7 @@ func (p *Pool) SubmitMapperBatchJobs(ctx context.Context, id string, mapper Mapp
 
 	// TrySubmit jobs
 	jobsSubmitted := 0
-	submissionErrors := merr.NewMultiError()
+	submissionErrors := NewMultiWorkerPoolError()
 	for _, j := range jobs {
 		err := p.TrySubmit(j)
 		if err != nil {
@@ -267,7 +264,7 @@ func fanInJobResults(ctx context.Context, channels ...<-chan JobResult) <-chan J
 
 func (p *Pool) doSubmit(job Job) error {
 	if len(p.jobQ) == p.maxJobs {
-		return fmt.Errorf("pool Job Queue is full with capacity: %d, Cannot accept job: %s till workers pick up jobs from the queue", len(p.jobQ), job.id)
+		return Wrapf(nil, PoolJobQueueFull, "pool Job Queue is full with capacity: %d, Cannot accept job: %s till workers pick up jobs from the queue", len(p.jobQ), job.id)
 	}
 	select {
 	case <-p.quitC:
