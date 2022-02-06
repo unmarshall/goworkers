@@ -15,7 +15,7 @@ import (
 func TestNewPool(t *testing.T) {
 	expectedPoolId := "pool-test-newpool"
 	p, err := NewPool(expectedPoolId, 10, WithMaxJobs(100))
-	defer func(p *Pool) {
+	defer func(p *pool) {
 		_ = p.Close()
 	}(p)
 	if err != nil {
@@ -57,7 +57,7 @@ func TestNewPoolWithValidWarmedUpWorkers(t *testing.T) {
 	expectedPoolId := "pool-test-new-warmed-up-pool"
 	const warmedUpWorkers int = 5
 	p, err := NewPool(expectedPoolId, 10, WithMaxJobs(100), WithWarmWorkers(warmedUpWorkers))
-	defer func(p *Pool) {
+	defer func(p *pool) {
 		_ = p.Close()
 	}(p)
 	if err != nil {
@@ -80,10 +80,10 @@ func TestClosePool(t *testing.T) {
 		t.Errorf("Expected no running workers, instead found %d", len(p.workers))
 	}
 	ctx := context.Background()
-	job := NewSupplierJob(ctx, "j1", createSupplierFn(ctx, 200))
-	p.Execute(job)
-	if p.running != 1 {
-		t.Errorf("Expected running workers 1 instead found :%d", p.running)
+	job := p.NewJob(ctx, "j1", createFn(ctx, 200))
+	_, err = job.Process()
+	if err != nil {
+		t.Errorf("Unexpected error processing job %s, Err: %+v\n", job.GetID(), err)
 	}
 	err = p.Close()
 	if err != nil {
@@ -94,28 +94,31 @@ func TestClosePool(t *testing.T) {
 	}
 }
 
-func TestExecute(t *testing.T) {
-	p, err := NewPool("pool-test-submit", 2, WithMaxJobs(10))
+func TestProcess(t *testing.T) {
+	p, err := NewPool("pool-test-submit", 2, WithMaxJobs(15))
 	if err != nil {
 		t.Fatalf("Error creating pool")
 	}
 	defer func() {
 		_ = p.Close()
 	}()
-	jobResults := make([]JobResult, 0, 10)
+	jobFutures := make([]JobFuture, 0, 10)
 	for i := 0; i < 10; i++ {
 		ctx := context.Background()
 		jobID := "j" + strconv.Itoa(i)
-		jobR := p.Execute(NewSupplierJob(ctx, jobID, createSupplierFn(ctx, 10)))
-		logger.Printf("Job: %s, Result: %v", jobID, jobR)
-		jobResults = append(jobResults, jobR)
+		jobF, err := p.NewJob(ctx, jobID, createFn(ctx, 10)).Process()
+		if err != nil {
+			t.Errorf("Unexpected error %+v\n", err)
+		}
+		jobFutures = append(jobFutures, jobF)
 	}
+	jobResults := waitOnJobFuturesAndGetResults(jobFutures)
 	if len(jobResults) != 10 {
 		t.Errorf("Expected 10 job results but found: %d", len(jobResults))
 	}
 }
 
-func TestExecuteWithTimeout(t *testing.T) {
+func TestProcessWithTimeout(t *testing.T) {
 	p, err := NewPool("pool-test-submit", 2, WithMaxJobs(10))
 	if err != nil {
 		t.Fatalf("Error creating pool")
@@ -125,7 +128,11 @@ func TestExecuteWithTimeout(t *testing.T) {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Millisecond)
 	defer cancel()
-	result := p.Execute(NewSupplierJob(ctx, "jobWithTimeout", createSupplierFn(ctx, 50)))
+	jobF, err := p.NewJob(ctx, "jobWithTimeout", createFn(ctx, 100)).Process()
+	if err != nil {
+		t.Errorf("Unexpected error %+v\n", err)
+	}
+	result := jobF.Await()
 	if result.Err == nil {
 		t.Errorf("Expected a cancellation error to be returned, found none")
 	}
@@ -135,39 +142,32 @@ func TestExecuteWithTimeout(t *testing.T) {
 }
 
 func TestExceedingPoolJobQueue(t *testing.T) {
-	p, err := NewPool("pool-test-exceed-jobQ", 2, WithMaxJobs(5))
+	p, err := NewPool("pool-test-exceed-taskQ", 2, WithMaxJobs(5))
 	if err != nil {
 		t.Fatalf("Error creating pool")
 	}
-	const totalJobs int = 30
-	var jobErr error
-	var jobResults []JobResult
+	const totalPayloads int = 30
 	defer func() {
-		if jobErr == nil {
-			t.Errorf("Exepected an error found none")
-		}
 		_ = p.Close()
 	}()
 	jobResultChannels := make([]<-chan JobResult, 0, 100)
-
-L:
-	for i := 0; i < totalJobs; i++ {
+	errCount := 0
+	for i := 0; i < totalPayloads; i++ {
 		ctx := context.Background()
-		job := NewSupplierJob(ctx, "j"+strconv.Itoa(i), createSupplierFn(ctx, 500))
-		jobErr = p.TrySubmit(job)
-		if jobErr != nil {
-			break L
+		jobF, err := p.NewJob(ctx, "j"+strconv.Itoa(i), createFn(ctx, 500)).Process()
+		if err != nil {
+			errCount += 1
+		} else {
+			jobResultChannels = append(jobResultChannels, jobF.Stream())
 		}
-		jobResultChannels = append(jobResultChannels, job.ResultC)
 	}
-	jobResults = collectJobResults(jobResultChannels)
-	if len(jobResults) == totalJobs {
-		t.Errorf("Expected lesser than %d jobs to be processed instead all jobs got processed", totalJobs)
+	if errCount == 0 {
+		t.Errorf("Expected submission errors but found none")
 	}
 }
 
 func TestSubmitMapperBatchJobs(t *testing.T) {
-	p, err := NewPool("pool-test-exceed-jobQ", 5, WithMaxJobs(100))
+	p, err := NewPool("pool-test-exceed-taskQ", 5, WithMaxJobs(100))
 	if err != nil {
 		t.Fatalf("(TestSubmitMapperBatchJobs) Error creating pool")
 	}
@@ -180,13 +180,11 @@ func TestSubmitMapperBatchJobs(t *testing.T) {
 	for i := 0; i < totalJobs; i++ {
 		payloads = append(payloads, rand.Intn(30))
 	}
-	submittedJobs, resultsC, err := p.SubmitMapperBatchJobs(ctx, "mapBatchTest", createMapperFn(ctx, 100), payloads)
+	jobF, err := p.NewMapperJob(ctx, "mapBatchTest", createMapperFn(ctx, 100)).ProcessPayloadBatch(payloads)
 	if err != nil {
-		t.Errorf("(TestSubmitMapperBatchJobs) Unexpected error %v\n", err)
+		t.Errorf("(TestSubmitMapperBatchJobs) Unexpected submission error(s) %v\n", err)
 	}
-	if submittedJobs != totalJobs {
-		t.Errorf("(TestSubmitMapperBatchJobs) Expected successful submission of %d jobs, actual: %d", totalJobs, submittedJobs)
-	}
+	resultsC := jobF.Stream()
 	jobResults := make([]JobResult, 0, totalJobs)
 	var erroneousResults int
 	for r := range resultsC {
@@ -201,6 +199,14 @@ func TestSubmitMapperBatchJobs(t *testing.T) {
 	if len(jobResults) != totalJobs {
 		t.Errorf("Expected %d results, actual: %d", totalJobs, len(jobResults))
 	}
+}
+
+func waitOnJobFuturesAndGetResults(jobFutures []JobFuture) []JobResult {
+	resultChannels := make([]<-chan JobResult, 0, len(jobFutures))
+	for _, jf := range jobFutures {
+		resultChannels = append(resultChannels, jf.Stream())
+	}
+	return collectJobResults(resultChannels)
 }
 
 func collectJobResults(resultChannels []<-chan JobResult) []JobResult {
@@ -220,13 +226,13 @@ func collectJobResults(resultChannels []<-chan JobResult) []JobResult {
 	return jobResults
 }
 
-func createMapperFn(ctx context.Context, sleep int) func(Any) JobResult {
-	return func(payload Any) JobResult {
+func createMapperFn(ctx context.Context, sleep int) func(Any) (Any, error) {
+	return func(payload Any) (Any, error) {
 		after := time.After(time.Duration(sleep) * time.Millisecond)
 		tick := time.Tick(time.Duration(1) * time.Millisecond)
 		i, ok := payload.(int)
 		if !ok {
-			return JobResult{Result: nil, Err: fmt.Errorf("failed to convert payload %v to int", payload)}
+			return nil, fmt.Errorf("failed to convert payload %v to int", payload)
 		}
 		var counter int
 	L:
@@ -234,40 +240,30 @@ func createMapperFn(ctx context.Context, sleep int) func(Any) JobResult {
 			select {
 			case <-ctx.Done():
 				logger.Printf("mapper job cancelled due to timeout")
-				return JobResult{nil, ctx.Err()}
+				return nil, ctx.Err()
 			case <-after:
 				break L
 			case <-tick:
 				counter += 1
 			}
 		}
-		return JobResult{
-			Result: i * counter,
-			Err:    nil,
-		}
+		return i * counter, nil
 	}
 }
 
-func createSupplierFn(ctx context.Context, sleep int) func() JobResult {
-	return func() JobResult {
-		var counter int
+func createFn(ctx context.Context, sleep int) func() error {
+	return func() error {
 		after := time.After(time.Duration(sleep) * time.Millisecond)
-		tick := time.Tick(time.Duration(1) * time.Millisecond)
 	L:
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Printf("supplier job cancelled due to timeout")
-				return JobResult{nil, ctx.Err()}
+				logger.Printf("processor job cancelled due to timeout")
+				return ctx.Err()
 			case <-after:
 				break L
-			case <-tick:
-				counter += 1
 			}
 		}
-		return JobResult{
-			Result: counter,
-			Err:    nil,
-		}
+		return nil
 	}
 }

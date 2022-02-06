@@ -7,7 +7,7 @@ type PoolOptions struct {
 	WarmWorkers int
 }
 
-// buildPoolOptions loads all Pool options and initializes PoolOptions with it
+// buildPoolOptions loads all pool options and initializes PoolOptions with it
 func buildPoolOptions(options ...PoolOption) *PoolOptions {
 	opts := new(PoolOptions)
 	for _, opt := range options {

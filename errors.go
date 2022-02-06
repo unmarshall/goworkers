@@ -15,6 +15,11 @@ const (
 	InvalidMaxWorker
 	InvalidWarmWorkers
 	PoolJobQueueFull
+	InsufficientCapacityForBatchJob
+)
+
+var (
+	PoolClosedErr = Wrapf(nil, PoolClosed, "pool is closed. No further job requests can be entertained")
 )
 
 type WorkerPoolError struct {

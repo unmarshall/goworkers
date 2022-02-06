@@ -3,23 +3,23 @@ package gwp
 import "log"
 
 type worker struct {
-	workerJobRequest
+	workerTaskRequest
 	quitC chan struct{}
-	pool  *Pool
+	pool  *pool
 }
 
-type workerJobRequest struct {
-	id   string
-	jobC chan Job
+type workerTaskRequest struct {
+	id    string
+	taskC chan task
 }
 
-func newWorker(id string, pool *Pool) *worker {
+func newWorker(id string, pool *pool) *worker {
 	quitC := make(chan struct{})
-	jobC := make(chan Job, 1)
+	taskC := make(chan task, 1)
 	return &worker{
-		workerJobRequest: workerJobRequest{id: id, jobC: jobC},
-		quitC:            quitC,
-		pool:             pool,
+		workerTaskRequest: workerTaskRequest{id: id, taskC: taskC},
+		quitC:             quitC,
+		pool:              pool,
 	}
 }
 
@@ -33,8 +33,8 @@ func (w *worker) start() {
 	go func() {
 		defer func() {
 			logger.Printf("(start) exiting for-select loop for worker: %s", w.id)
-			close(w.jobC)
-			w.jobC = nil
+			close(w.taskC)
+			w.taskC = nil
 			delete(w.pool.workers, w.id)
 			w.pool.decRunningWorker()
 			log.Printf("Stopped worker %s", w.id)
@@ -46,23 +46,24 @@ func (w *worker) start() {
 				logger.Printf("Received a request to close worker: %s. Stopping worker.", w.id)
 				w.quitC = nil
 				return
-			case job, ok := <-w.jobC:
+			case t, ok := <-w.taskC:
 				if !ok {
-					// logger.Printf("Job channel for worker:%s has been closed", w.id)
+					// logger.Printf("task channel for worker:%s has been closed", w.id)
 					return
 				}
-				logger.Printf("Worker: %s received Job: %s", w.id, job.id)
+				logger.Printf("Worker: %s received task: %s", w.id, t.id)
 				select {
-				case <-job.ctx.Done():
-					logger.Printf("Context has been cancelled for job :%s", job.id)
-					job.ResultC <- JobResult{
+				case <-t.job.ctx.Done():
+					logger.Printf("Context has been cancelled for task :%s", t.id)
+					t.resultC <- JobResult{
 						Result: nil,
-						Err:    job.ctx.Err(),
+						Status: Cancelled,
+						Err:    t.job.ctx.Err(),
 					}
 					continue
 				default:
-					// logger.Printf("worker %s, processing job: %s", w.id, job.id)
-					processJob(job)
+					logger.Printf("worker %s, processing task: %s", w.id, t.id)
+					processJob(t)
 				}
 			}
 			if !w.signalAvailability() {
@@ -73,26 +74,43 @@ func (w *worker) start() {
 }
 
 func (w *worker) signalAvailability() bool {
-	// Register availability by pushing the jobQ to worker Pool job Queue
+	// Register availability by pushing the taskQ to worker pool job Queue
 	select {
-	case w.pool.workerJobQ <- w.workerJobRequest:
-		// logger.Printf("worker %s is now available, pushed its jobC to pool", w.id)
+	case w.pool.workerTaskQ <- w.workerTaskRequest:
+		 logger.Printf("worker %s is now available, pushed its taskC to pool", w.id)
 		return true
 	default:
-		// logger.Printf("Looks like the pool's workerJobQ has been closed. Exiting this worker")
+		 logger.Printf("Looks like the pool's workerTaskQ has been closed. Exiting this worker")
 		return false
 	}
 }
 
-func processJob(job Job) {
-	defer close(job.ResultC)
-	var result JobResult
-	if job.isSupplier() {
-		result = job.supplier()
+func processJob(t task) {
+	defer close(t.resultC)
+	var jobResult JobResult
+	if t.job.isMapper() {
+		result, err := t.job.mapper(t.payload)
+		jobResult = createJobResult(result, err)
 	} else {
-		result = job.mapper(job.payload)
+		err := t.job.processor()
+		jobResult = createJobResult(nil, err)
 	}
-	job.ResultC <- result
+	t.resultC <- jobResult
+	logger.Printf("pushed jobResult: %v to result queue of task: %s", jobResult, t.id)
+}
+
+func createJobResult(result Any, err error) JobResult {
+	var status Status
+	if err != nil {
+		status = Failed
+	} else {
+		status = Success
+	}
+	return JobResult{
+		Result: result,
+		Status: status,
+		Err: err,
+	}
 }
 
 func (w *worker) Close() error {
