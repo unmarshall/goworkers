@@ -22,8 +22,6 @@ const (
 	Rejected
 )
 
-type Any interface{}
-
 // At present there is support to provide two kinds of functions as described below. In general functional programming style you have mappers, consumers, bi-functions etc.
 // For now the support has been kept to a minimum of two type of functions. If there is a need we can easily add more function types.
 // ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -37,7 +35,7 @@ type Fn func() error
 // This allows for submitting batch jobs where the user needs to pass a common
 // processor function and pass a slice of payloads. For each payload a new job will be generated internally and concurrently executed by available workers.
 // NOTE: When 1.18 brings in generics then we can define a MapperFn which takes in a T and returns a R and error
-type MapperFn func(Any) (Any, error)
+type MapperFn func(interface{}) (interface{}, error)
 
 // JobMetric captures limited metrics for each Job
 type JobMetric struct {
@@ -92,12 +90,12 @@ type Job interface {
 	GetID() string
 	GetStatus() Status
 	Process() (JobFuture, error)
-	ProcessPayload(payload Any) (JobFuture, error)
-	ProcessPayloadBatch(payloads []Any) (JobFuture, error)
+	ProcessPayload(payload interface{}) (JobFuture, error)
+	ProcessPayloadBatch(payloads []interface{}) (JobFuture, error)
 }
 
 type JobResult struct {
-	Result Any
+	Result interface{}
 	Status Status
 	Err    error
 	Metric JobMetric

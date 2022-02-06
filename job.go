@@ -22,10 +22,10 @@ type task struct {
 	id      string
 	job     *job
 	resultC chan JobResult
-	payload Any
+	payload interface{}
 }
 
-func (j *job) newTask(payload Any, taskNum int) task {
+func (j *job) newTask(payload interface{}, taskNum int) task {
 	taskResultC := make(chan JobResult, 1)
 	return task{
 		id:      fmt.Sprintf("%s-%d", j.id, taskNum),
@@ -52,7 +52,7 @@ func (j *job) Process() (JobFuture, error) {
 	return j.submitTask(t)
 }
 
-func (j *job) ProcessPayload(payload Any) (JobFuture, error) {
+func (j *job) ProcessPayload(payload interface{}) (JobFuture, error) {
 	if !j.isMapper() {
 		return nil, fmt.Errorf("job %s has a function defined which does not take any payload. You should call Process instead", j.id)
 	}
@@ -60,7 +60,7 @@ func (j *job) ProcessPayload(payload Any) (JobFuture, error) {
 	return j.submitTask(t)
 }
 
-func (j *job) ProcessPayloadBatch(payloads []Any) (JobFuture, error) {
+func (j *job) ProcessPayloadBatch(payloads []interface{}) (JobFuture, error) {
 	if !j.isMapper() {
 		return nil, fmt.Errorf("job %s has a function defined which does not take any payload. You should call Process instead", j.id)
 	}

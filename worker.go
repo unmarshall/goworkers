@@ -99,7 +99,7 @@ func processJob(t task) {
 	logger.Printf("pushed jobResult: %v to result queue of task: %s", jobResult, t.id)
 }
 
-func createJobResult(result Any, err error) JobResult {
+func createJobResult(result interface{}, err error) JobResult {
 	var status Status
 	if err != nil {
 		status = Failed

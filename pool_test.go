@@ -176,7 +176,7 @@ func TestSubmitMapperBatchJobs(t *testing.T) {
 	}()
 	const totalJobs int = 30
 	ctx := context.Background()
-	payloads := make([]Any, 0, totalJobs)
+	payloads := make([]interface{}, 0, totalJobs)
 	for i := 0; i < totalJobs; i++ {
 		payloads = append(payloads, rand.Intn(30))
 	}
@@ -226,8 +226,8 @@ func collectJobResults(resultChannels []<-chan JobResult) []JobResult {
 	return jobResults
 }
 
-func createMapperFn(ctx context.Context, sleep int) func(Any) (Any, error) {
-	return func(payload Any) (Any, error) {
+func createMapperFn(ctx context.Context, sleep int) func(interface{}) (interface{}, error) {
+	return func(payload interface{}) (interface{}, error) {
 		after := time.After(time.Duration(sleep) * time.Millisecond)
 		tick := time.Tick(time.Duration(1) * time.Millisecond)
 		i, ok := payload.(int)
