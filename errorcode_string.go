@@ -12,11 +12,12 @@ func _() {
 	_ = x[InvalidMaxWorker-2]
 	_ = x[InvalidWarmWorkers-3]
 	_ = x[PoolJobQueueFull-4]
+	_ = x[InsufficientCapacityForBatchJob-5]
 }
 
-const _ErrorCode_name = "PoolClosedInvalidMaxWorkerInvalidWarmWorkersPoolJobQueueFull"
+const _ErrorCode_name = "PoolClosedInvalidMaxWorkerInvalidWarmWorkersPoolJobQueueFullInsufficientCapacityForBatchJob"
 
-var _ErrorCode_index = [...]uint8{0, 10, 26, 44, 60}
+var _ErrorCode_index = [...]uint8{0, 10, 26, 44, 60, 91}
 
 func (i ErrorCode) String() string {
 	i -= 1
