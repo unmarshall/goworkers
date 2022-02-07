@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const (
@@ -76,7 +77,7 @@ func (p *pool) start() {
 	for {
 		select {
 		case <-p.quitC:
-			logger.Printf("Received request to shutdown pool: %s", p.id)
+			logger.Printf("(start) Received request to shutdown pool: %s", p.id)
 			return
 		case t, ok := <-p.taskQ:
 			if !ok {
@@ -179,6 +180,7 @@ func (p *pool) doSubmit(t task) error {
 	if len(p.taskQ) == p.maxJobs {
 		return Wrapf(nil, PoolJobQueueFull, "pool job Queue is full with capacity: %d, Cannot accept task: %s till workers pick up tasks from the queue", len(p.taskQ), t.id)
 	}
+	t.enqueueTime = time.Now()
 	select {
 	case <-p.quitC:
 		return PoolClosedErr

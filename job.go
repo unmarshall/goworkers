@@ -3,6 +3,7 @@ package gwp
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // job is a unit of work that will be executed by an available worker
@@ -23,6 +24,17 @@ type task struct {
 	job     *job
 	resultC chan JobResult
 	payload interface{}
+	// metrics which can be used to further tune either the processor's logic or pool configuration
+	enqueueTime  time.Time // Time when this task was submitted to the pool
+	runStartTime time.Time // Time when processor was run by a worker
+	runEndTime   time.Time // Time when worker finished running this task
+}
+
+func (t task) getMetric() JobMetric {
+	return JobMetric{
+		runDuration:     t.runEndTime.Sub(t.runStartTime),
+		enqueueDuration: t.runStartTime.Sub(t.enqueueTime),
+	}
 }
 
 func (j *job) newTask(payload interface{}, taskNum int) task {

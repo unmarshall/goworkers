@@ -1,6 +1,9 @@
 package gwp
 
-import "log"
+import (
+	"log"
+	"time"
+)
 
 type worker struct {
 	workerTaskRequest
@@ -77,29 +80,32 @@ func (w *worker) signalAvailability() bool {
 	// Register availability by pushing the taskQ to worker pool job Queue
 	select {
 	case w.pool.workerTaskQ <- w.workerTaskRequest:
-		 logger.Printf("worker %s is now available, pushed its taskC to pool", w.id)
+		logger.Printf("worker %s is now available, pushed its taskC to pool", w.id)
 		return true
 	default:
-		 logger.Printf("Looks like the pool's workerTaskQ has been closed. Exiting this worker")
+		logger.Printf("Looks like the pool's workerTaskQ has been closed. Exiting this worker")
 		return false
 	}
 }
 
 func processJob(t task) {
 	defer close(t.resultC)
+	t.runStartTime = time.Now()
 	var jobResult JobResult
 	if t.job.isMapper() {
 		result, err := t.job.mapper(t.payload)
-		jobResult = createJobResult(result, err)
+		t.runEndTime = time.Now()
+		jobResult = createJobResult(result, err, t.getMetric())
 	} else {
 		err := t.job.processor()
-		jobResult = createJobResult(nil, err)
+		t.runEndTime = time.Now()
+		jobResult = createJobResult(nil, err, t.getMetric())
 	}
 	t.resultC <- jobResult
 	logger.Printf("pushed jobResult: %v to result queue of task: %s", jobResult, t.id)
 }
 
-func createJobResult(result interface{}, err error) JobResult {
+func createJobResult(result interface{}, err error, metric JobMetric) JobResult {
 	var status Status
 	if err != nil {
 		status = Failed
@@ -109,7 +115,8 @@ func createJobResult(result interface{}, err error) JobResult {
 	return JobResult{
 		Result: result,
 		Status: status,
-		Err: err,
+		Err:    err,
+		Metric: metric,
 	}
 }
 

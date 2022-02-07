@@ -95,7 +95,7 @@ func TestClosePool(t *testing.T) {
 }
 
 func TestProcess(t *testing.T) {
-	p, err := NewPool("pool-test-submit", 2, WithMaxJobs(15))
+	p, err := NewPool("pool-test-process", 2, WithMaxJobs(15))
 	if err != nil {
 		t.Fatalf("Error creating pool")
 	}
@@ -119,7 +119,7 @@ func TestProcess(t *testing.T) {
 }
 
 func TestProcessWithTimeout(t *testing.T) {
-	p, err := NewPool("pool-test-submit", 2, WithMaxJobs(10))
+	p, err := NewPool("pool-test-process-with-timeout", 2, WithMaxJobs(10))
 	if err != nil {
 		t.Fatalf("Error creating pool")
 	}
@@ -142,7 +142,7 @@ func TestProcessWithTimeout(t *testing.T) {
 }
 
 func TestExceedingPoolJobQueue(t *testing.T) {
-	p, err := NewPool("pool-test-exceed-taskQ", 2, WithMaxJobs(5))
+	p, err := NewPool("pool-test-exceed-jobq", 2, WithMaxJobs(5))
 	if err != nil {
 		t.Fatalf("Error creating pool")
 	}
@@ -167,7 +167,7 @@ func TestExceedingPoolJobQueue(t *testing.T) {
 }
 
 func TestSubmitMapperBatchJobs(t *testing.T) {
-	p, err := NewPool("pool-test-exceed-taskQ", 5, WithMaxJobs(100))
+	p, err := NewPool("pool-submit-mapper-batch-jobs", 5, WithMaxJobs(100))
 	if err != nil {
 		t.Fatalf("(TestSubmitMapperBatchJobs) Error creating pool")
 	}
@@ -194,10 +194,10 @@ func TestSubmitMapperBatchJobs(t *testing.T) {
 		}
 	}
 	if erroneousResults > 0 {
-		t.Errorf("Expected no errors, instead found %d errorneous results", erroneousResults)
+		t.Errorf("(TestSubmitMapperBatchJobs) Expected no errors, instead found %d errorneous results", erroneousResults)
 	}
 	if len(jobResults) != totalJobs {
-		t.Errorf("Expected %d results, actual: %d", totalJobs, len(jobResults))
+		t.Errorf("(TestSubmitMapperBatchJobs) Expected %d results, actual: %d", totalJobs, len(jobResults))
 	}
 }
 
