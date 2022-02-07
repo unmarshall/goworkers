@@ -16,7 +16,7 @@ features:
 **TODO:**
 * Add support to configure worker idle timeout and use that to shutdown workers which are no longer actively being used.
 * Add support for consumer functional type processor - `consumerFn = func(payload interface{})`
-* See if there is a need for a perpetual job which is submitted once to the pool and gets an input channel where it will get the payloads from and then internally it schedules the processing of the payloads as they arrive on available workers. Processor for this will take a channel `channelConsumerFn = func(payloadC <-chan interface{})`. This type of job you can only submit once. One can stop these tasks via cancelling the context.
+* See if there is a need for a perpetual job which is submitted once to the pool and gets an input channel where it will get the payloads from and then internally it schedules the processing of the payloads as they arrive on available workers. Processor for this will take a channel `channelConsumerFn = func(payloadC <-chan interface{})`. This type of job you can only submit once. One can stop these tasks via cancelling the context. If the result needs to be also pushed to a channel then there always needs to be an active consumer of results from the results channel. Think over it, if its really needed.
 
 ## Usage:
 
