@@ -176,7 +176,7 @@ func (p *pool) canAccommodateTasksAndGetAvailableCap(taskCount int) (bool, int) 
 	return availableCap >= taskCount, availableCap
 }
 
-func (p *pool) doSubmit(t task) error {
+func (p *pool) submit(t task) error {
 	if len(p.taskQ) == p.maxJobs {
 		return Wrapf(nil, PoolJobQueueFull, "pool job Queue is full with capacity: %d, Cannot accept task: %s till workers pick up tasks from the queue", len(p.taskQ), t.id)
 	}

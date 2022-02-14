@@ -107,7 +107,7 @@ func (j *job) submitTask(t task) (JobFuture, error) {
 }
 
 func (j *job) doSubmitTask(t task) error {
-	err := j.pool.doSubmit(t)
+	err := j.pool.submit(t)
 	if err != nil {
 		close(t.resultC)
 		return err

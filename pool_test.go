@@ -17,6 +17,7 @@ func TestNewPool(t *testing.T) {
 	p, err := NewPool(expectedPoolId, 10, WithMaxJobs(100))
 	defer func(p *pool) {
 		_ = p.Close()
+		p = nil
 	}(p)
 	if err != nil {
 		t.Fatalf("Error creating pool.")
@@ -59,6 +60,7 @@ func TestNewPoolWithValidWarmedUpWorkers(t *testing.T) {
 	p, err := NewPool(expectedPoolId, 10, WithMaxJobs(100), WithWarmWorkers(warmedUpWorkers))
 	defer func(p *pool) {
 		_ = p.Close()
+		p = nil
 	}(p)
 	if err != nil {
 		t.Fatalf("Error creating pool.")
@@ -92,6 +94,7 @@ func TestClosePool(t *testing.T) {
 	if len(p.workers) != 0 {
 		t.Errorf("Expected no running workers, instead found: %d", len(p.workers))
 	}
+	p = nil
 }
 
 func TestProcess(t *testing.T) {
@@ -101,6 +104,7 @@ func TestProcess(t *testing.T) {
 	}
 	defer func() {
 		_ = p.Close()
+		p = nil
 	}()
 	jobFutures := make([]JobFuture, 0, 10)
 	for i := 0; i < 10; i++ {
@@ -125,6 +129,7 @@ func TestProcessWithTimeout(t *testing.T) {
 	}
 	defer func() {
 		_ = p.Close()
+		p = nil
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10)*time.Millisecond)
 	defer cancel()
@@ -149,6 +154,7 @@ func TestExceedingPoolJobQueue(t *testing.T) {
 	const totalPayloads int = 30
 	defer func() {
 		_ = p.Close()
+		p = nil
 	}()
 	jobResultChannels := make([]<-chan JobResult, 0, 100)
 	errCount := 0
@@ -173,6 +179,7 @@ func TestSubmitMapperBatchJobs(t *testing.T) {
 	}
 	defer func() {
 		_ = p.Close()
+		p = nil
 	}()
 	const totalJobs int = 30
 	ctx := context.Background()
