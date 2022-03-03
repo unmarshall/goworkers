@@ -1,7 +1,7 @@
 # Golang Worker Pool
 
 ![Build Status](https://github.com/unmarshall/goworkers/actions/workflows/go.yml/badge.svg)
-![Go Report Card](https://goreportcard.com/report/github.com/unmarshall/goworkers)
+[![Go Report Card](https://goreportcard.com/badge/github.com/unmarshall/goworkers](https://goreportcard.com/report/github.com/unmarshall/goworkers)
 
 Zero dependency golang goroutines pool library. It is useful in situations where you wish to control the number of goroutines in concurrent activities. It has the following
 features:
