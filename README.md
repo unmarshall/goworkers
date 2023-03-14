@@ -55,8 +55,11 @@ A new job is created passing a `processor` which takes no input and returns only
 func main() {
     // create an initialize pool
     // ------------------------------------------------------------------------------
+    // Create a context with a timeout or deadline or with cancel. As an example we demonstrate creating a context with cancel.
+    ctx, cancelFn := context.WithCancel(context.Background())
+    defer cancelFn()
     // Creating a simple processor function and submitting it.
-    jobFuture, err := p.NewJob(context.Background(), "job1", processor).Process()
+    jobFuture, err := p.NewJob(ctx, "job1", processor).Process()
     // err can happen only if there is an issue submitting this Job. If the job is submitted
     // to the pool then any error thereafter can be accessed via JobFuture
     if err != nil {
@@ -88,9 +91,11 @@ func main() {
     // ------------------------------------------------------------------------------
     // create payload that you wish to pass
     var payload interface{}
-
+    // Create a context with a timeout or deadline or with cancel. As an example we demonstrate creating a context with cancel.
+    ctx, cancelFn := context.WithCancel(context.Background())
+    defer cancelFn()
     // Creating a simple processor function and submitting it.
-    jobFuture, err := p.NewMapperJob(context.Background(), "job1", mapProcessor).ProcessPayload(payload)
+    jobFuture, err := p.NewMapperJob(ctx, "job1", mapProcessor).ProcessPayload(payload)
     // err can happen only if there is an issue submitting this Job. If the job is submitted
     // to the pool then any error thereafter can be accessed via JobFuture
     if err != nil {
@@ -123,9 +128,11 @@ func main() {
     // ------------------------------------------------------------------------------
     // create payloads that you wish to pass
     var payloads []interface{}
-
+    // Create a context with a timeout or deadline or with cancel. As an example we demonstrate creating a context with cancel.
+    ctx, cancelFn := context.WithCancel(context.Background())
+    defer cancelFn()
     // Creating a simple processor function and submitting it.
-    jobFuture, err := p.NewMapperJob(context.Background(), "job1", mapProcessor).ProcessPayloadBatch(payloads)
+    jobFuture, err := p.NewMapperJob(ctx, "job1", mapProcessor).ProcessPayloadBatch(payloads)
     // err can happen only if there is an issue submitting this Job. If the job is submitted
     // to the pool then any error thereafter can be accessed via JobFuture
     if err != nil {
